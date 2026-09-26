@@ -86,7 +86,7 @@
     <div class="login-hero">
       <i class="fa-solid fa-building-shield"></i>
       <h2>İzmir Riskli Yapı CBS</h2>
-      <p>Riskli Yapı, Tapu, Malik, Tebligat, Belge ve Süre Takip Sistemi • V15</p><div id="buildStamp" style="margin-top:5px;font-size:9px;color:#99f6e4">Yapı: V15 • Giriş düzeltmesi</div>
+      <p>Riskli Yapı, Tapu, Malik, Tebligat, Belge ve Süre Takip Sistemi • V16</p><div id="buildStamp" style="margin-top:5px;font-size:9px;color:#99f6e4">Yapı: V16 • Başlangıç ve giriş hatası düzeltildi</div>
     </div>
     <form id="loginForm" class="login-form">
       <div class="field"><label>Kullanıcı Adı</label><input id="loginUsername" type="text" value="m.ilcin" autocomplete="username" required></div>
@@ -258,8 +258,10 @@ const $=id=>document.getElementById(id);
 const loginOverlay=$('loginOverlay'), loginForm=$('loginForm'), loginUsername=$('loginUsername'), loginPassword=$('loginPassword'), loginError=$('loginError');
 const roleText=$('roleText'), btnLogout=$('btnLogout'), btnNewBuilding=$('btnNewBuilding'), btnRecords=$('btnRecords'), btnAudit=$('btnAudit'), btnUsers=$('btnUsers'), btnExport=$('btnExport'), btnImport=$('btnImport'), importFile=$('importFile');
 const globalSearch=$('globalSearch'), districtFilter=$('districtFilter'), stageFilter=$('stageFilter'), noticeFilter=$('noticeFilter'), btnResetFilters=$('btnResetFilters'), baseMapSelect=$('baseMapSelect'), btn3DView=$('btn3DView'), btnBayrakliReference=$('btnBayrakliReference');
+const btnNotifications=$('btnNotifications'), btnDocuments=$('btnDocuments'), notificationBadge=$('notificationBadge'), sidePanelToggle=$('sidePanelToggle');
 const emptySide=$('emptySide'), sideContent=$('sideContent'), modalRoot=$('modalRoot');
 const sumTotal=$('sumTotal'), sumOwners=$('sumOwners'), sumPending=$('sumPending'), sumNoticeDone=$('sumNoticeDone'), sumCritical=$('sumCritical'), sumCompleted=$('sumCompleted');
+const demoData=[];
 function clone(v){return JSON.parse(JSON.stringify(v))}
 function loadData(){try{const current=localStorage.getItem(STORAGE_KEY);if(current)return JSON.parse(current);const legacy=localStorage.getItem(LEGACY_STORAGE_KEY);return legacy?JSON.parse(legacy):clone(demoData)}catch(e){return clone(demoData)}}
 function normalizeData(){
@@ -626,16 +628,34 @@ function setQuickSummaryFilter(kind){
 function bindSummaryCard(id,handler){const el=document.getElementById(id);if(!el)return;el.onclick=handler;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handler();}}}
 function openRecords(){const rows=buildings.filter(buildingMatches).map(b=>{const s=buildingNoticeSummary(b),c=getCriticalInfo(b);return `<tr onclick="closeModal();selectBuilding('${b.id}',true)" style="cursor:pointer"><td>${esc(b.riskFileNo)}</td><td>${esc(b.maks)}</td><td>${esc(b.district)} / ${esc(b.neighborhood)}</td><td>${esc(b.ada)}/${esc(b.parsel)}</td><td>${(b.owners||[]).length}</td><td>${s.complete}/${s.total}</td><td>${b.stage}) ${esc(stages[b.stage].name)}</td><td>${c?`<span style="color:${deadlineState(c).color};font-weight:700">${esc(deadlineState(c).label)}</span>`:'—'}</td></tr>`}).join('');openModal('Riskli Yapı Kayıt Listesi',`<div class="notice-box">Satıra tıklayarak yapıyı haritada açabilirsiniz.</div><div class="table-wrap"><table class="table"><thead><tr><th>Dosya</th><th>MAKS</th><th>Konum</th><th>Ada/Parsel</th><th>Malik</th><th>Tebligat</th><th>Süreç</th><th>Kritik Süre</th></tr></thead><tbody>${rows||'<tr><td colspan="8">Kayıt yok.</td></tr>'}</tbody></table></div>`,`<button class="btn" onclick="closeModal()">Kapat</button>`,'xl')}
 function openAudit(){const rows=audit.map(a=>`<tr><td>${new Date(a.at).toLocaleString('tr-TR')}</td><td>${esc(a.user||'—')}</td><td>${esc(a.role)}</td><td>${esc(a.action)}</td><td>${esc(a.detail||'')}</td></tr>`).join('');openModal('İşlem Logu',`<div class="table-wrap"><table class="table"><thead><tr><th>Zaman</th><th>Kullanıcı</th><th>Rol</th><th>İşlem</th><th>Detay</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Henüz log yok.</td></tr>'}</tbody></table></div>`,`<button class="btn" onclick="closeModal()">Kapat</button>`,'xl')}
-function exportJson(){const blob=new Blob([JSON.stringify({version:15,exportedAt:new Date().toISOString(),buildings},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='riskli_yapi_takip_v15_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);logAction('JSON dışa aktarıldı')}
+function exportJson(){const blob=new Blob([JSON.stringify({version:16,exportedAt:new Date().toISOString(),buildings},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='riskli_yapi_takip_v16_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);logAction('JSON dışa aktarıldı')}
 function importJson(file){const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const arr=Array.isArray(x)?x:x.buildings;if(!Array.isArray(arr))throw new Error('Geçersiz veri yapısı');if(!confirm(arr.length+' yapı içeri alınacak ve mevcut demo verisi değiştirilecek. Devam?'))return;buildings=arr;saveData('JSON içeri aktarıldı',arr.length+' yapı');populateFilters();renderMap();closeModal();alert('İçe aktarma tamamlandı.')}catch(e){alert('JSON okunamadı: '+e.message)}};r.readAsText(file)}
 
 const btnResetDemoUsers=document.getElementById('btnResetDemoUsers');
 if(btnResetDemoUsers)btnResetDemoUsers.onclick=async()=>{if(!confirm('Demo kullanıcıları sıfırlansın mı? Eklediğiniz yerel kullanıcı hesapları silinir.'))return;await ensureUsers(true);loginUsername.value='m.ilcin';loginPassword.value='M.1234';showLoginError('Kullanıcılar sıfırlandı. Ana yönetici: m.ilcin / M.1234');};
 loginForm.addEventListener('submit',async e=>{e.preventDefault();showLoginError('');const submit=e.submitter||loginForm.querySelector('button[type=submit]');if(submit)submit.disabled=true;try{const user=await authenticate(loginUsername.value,loginPassword.value);if(!user){showLoginError('Kullanıcı adı veya şifre hatalı ya da kullanıcı pasif.');return}currentUser={...user};currentRole=user.role;updatePermissionUi();loginOverlay.classList.add('hidden');logAction('Oturum açıldı',user.username);setTimeout(()=>{try{map&&map.invalidateSize()}catch(_e){}},120)}catch(err){console.error(err);showLoginError('Giriş sırasında hata oluştu. Sayfayı yenileyip tekrar deneyin.')}finally{if(submit)submit.disabled=false}});
 btnLogout.onclick=()=>{if(currentUser)logAction('Oturum kapatıldı',currentUser.username);currentUser=null;currentRole='viewer';updatePermissionUi();loginPassword.value='';showLoginError('');loginOverlay.classList.remove('hidden');setTimeout(()=>loginUsername.focus(),50)};btnNewBuilding.onclick=()=>openBuildingModal();btnRecords.onclick=openRecords;btnAudit.onclick=openAudit;if(btnUsers)btnUsers.onclick=openUserManager;btnExport.onclick=exportJson;btnImport.onclick=()=>importFile.click();importFile.onchange=e=>{if(e.target.files[0])importJson(e.target.files[0]);e.target.value=''};
-[globalSearch,stageFilter,noticeFilter].forEach(el=>el.addEventListener(el===globalSearch?'input':'change',renderMap));districtFilter.addEventListener('change',()=>{renderMap();zoomToDistrict(districtFilter.value)});if(baseMapSelect)baseMapSelect.addEventListener('change',e=>switchBaseMap(e.target.value));if(btnBayrakliReference)btnBayrakliReference.addEventListener('click',toggleBayrakliReference);if(btn3DView)btn3DView.addEventListener('click',open3DView);btnResetFilters.onclick=()=>{globalSearch.value='';districtFilter.value='all';stageFilter.value='all';noticeFilter.value='all';renderMap();zoomToDistrict('all')};btnNotifications.onclick=openNotificationCenter;btnDocuments.onclick=openDocumentsOverview;sidePanelToggle.onclick=()=>toggleSidePanel();bindSummaryCard('totalSummaryCard',openRecords);bindSummaryCard('ownersSummaryCard',openOwnersOverview);bindSummaryCard('pendingSummaryCard',()=>setQuickSummaryFilter('pending'));bindSummaryCard('noticeDoneSummaryCard',()=>setQuickSummaryFilter('complete'));bindSummaryCard('criticalSummaryCard',openDeadlineDashboard);bindSummaryCard('completedSummaryCard',()=>setQuickSummaryFilter('completed'));
+[globalSearch,stageFilter,noticeFilter].filter(Boolean).forEach(el=>el.addEventListener(el===globalSearch?'input':'change',renderMap));
+if(districtFilter)districtFilter.addEventListener('change',()=>{renderMap();zoomToDistrict(districtFilter.value)});
+if(baseMapSelect)baseMapSelect.addEventListener('change',e=>switchBaseMap(e.target.value));
+if(btnBayrakliReference)btnBayrakliReference.addEventListener('click',toggleBayrakliReference);
+if(btn3DView)btn3DView.addEventListener('click',open3DView);
+if(btnResetFilters)btnResetFilters.onclick=()=>{globalSearch.value='';districtFilter.value='all';stageFilter.value='all';noticeFilter.value='all';renderMap();zoomToDistrict('all')};
+if(btnNotifications)btnNotifications.onclick=openNotificationCenter;
+if(btnDocuments)btnDocuments.onclick=openDocumentsOverview;
+if(sidePanelToggle)sidePanelToggle.onclick=()=>toggleSidePanel();
+bindSummaryCard('totalSummaryCard',openRecords);
+bindSummaryCard('ownersSummaryCard',openOwnersOverview);
+bindSummaryCard('pendingSummaryCard',()=>setQuickSummaryFilter('pending'));
+bindSummaryCard('noticeDoneSummaryCard',()=>setQuickSummaryFilter('complete'));
+bindSummaryCard('criticalSummaryCard',openDeadlineDashboard);
+bindSummaryCard('completedSummaryCard',()=>setQuickSummaryFilter('completed'));
 
-normalizeData();renderLegend();populateFilters();initMap();renderSummary();renderNotifications();ensureUsers().then(()=>{updatePermissionUi();loginUsername.focus()}).catch(console.error);if(document.getElementById('bayrakliRefCount'))document.getElementById('bayrakliRefCount').textContent=BAYRAKLI_META.count.toLocaleString('tr-TR');if(localStorage.getItem('riskliSideCollapsed')==='1')toggleSidePanel(true);
+try{normalizeData();renderLegend();populateFilters();renderSummary();renderNotifications()}catch(e){console.error('Başlangıç arayüzü hazırlanamadı',e)}
+try{if(typeof L!=='undefined')initMap();else console.warn('Leaflet henüz yüklenemedi.')}catch(e){console.error('Harita başlatılamadı',e)}
+ensureUsers().then(()=>{updatePermissionUi();loginUsername?.focus()}).catch(e=>console.error('Kullanıcı sistemi hazırlanamadı',e));
+if(document.getElementById('bayrakliRefCount'))document.getElementById('bayrakliRefCount').textContent=BAYRAKLI_META.count.toLocaleString('tr-TR');
+try{if(localStorage.getItem('riskliSideCollapsed')==='1')toggleSidePanel(true)}catch(e){console.warn(e)};
 </script>
 </body>
 </html>
