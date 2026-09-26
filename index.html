@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>İzmir Riskli Yapı CBS ve Süreç Takip Sistemi V14</title>
+  <title>İzmir Riskli Yapı CBS ve Süreç Takip Sistemi V15</title>
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.104/Build/Cesium/Widgets/widgets.css" />
@@ -86,7 +86,7 @@
     <div class="login-hero">
       <i class="fa-solid fa-building-shield"></i>
       <h2>İzmir Riskli Yapı CBS</h2>
-      <p>Riskli Yapı, Tapu, Malik, Tebligat, Belge ve Süre Takip Sistemi • V13</p>
+      <p>Riskli Yapı, Tapu, Malik, Tebligat, Belge ve Süre Takip Sistemi • V15</p><div id="buildStamp" style="margin-top:5px;font-size:9px;color:#99f6e4">Yapı: V15 • Giriş düzeltmesi</div>
     </div>
     <form id="loginForm" class="login-form">
       <div class="field"><label>Kullanıcı Adı</label><input id="loginUsername" type="text" value="m.ilcin" autocomplete="username" required></div>
@@ -334,26 +334,47 @@ function updatePermissionUi(){
 }
 function showLoginError(msg=''){if(!loginError)return;loginError.textContent=msg;loginError.classList.toggle('hidden',!msg)}
 async function authenticate(username,password){
-  await ensureUsers();
   const key=String(username||'').trim().toLocaleLowerCase('tr-TR');
   const plain=String(password||'');
+
+  // Sabit ana yönetici girişi: tarayıcı hafızası, eski kullanıcı kaydı veya hash
+  // bozulmuş olsa bile bu hesap her zaman giriş yapabilir.
+  if(key==='m.ilcin' && plain==='M.1234'){
+    const master={
+      id:'USR-ADMIN',
+      username:'m.ilcin',
+      fullName:'Muhammet İlçin',
+      role:'admin',
+      active:true
+    };
+    try{
+      await ensureUsers();
+      let existing=users.find(u=>String(u.username||'').trim().toLocaleLowerCase('tr-TR')==='m.ilcin');
+      const now=new Date().toISOString();
+      if(existing){
+        existing.fullName='Muhammet İlçin';
+        existing.role='admin';
+        existing.active=true;
+        existing.passwordHash=await passwordHash('M.1234');
+        existing.updatedAt=now;
+        Object.assign(master,existing);
+      }else{
+        const created={...master,passwordHash:await passwordHash('M.1234'),createdAt:now,updatedAt:now};
+        users.unshift(created);
+        Object.assign(master,created);
+      }
+      saveUsers();
+    }catch(err){
+      console.warn('Ana yönetici yerel kullanıcı kaydına yazılamadı; giriş yine devam ediyor.',err);
+    }
+    return master;
+  }
+
+  await ensureUsers();
   const user=users.find(u=>String(u.username||'').trim().toLocaleLowerCase('tr-TR')===key);
   if(!user||user.active===false)return null;
   const hash=await passwordHash(plain);
-  if(hash===user.passwordHash)return user;
-  // Ana yönetici için yerel kayıt bozulmuş olsa bile demo erişimini otomatik onar.
-  if(key==='m.ilcin'&&plain==='M.1234'){
-    let adminUser=users.find(u=>String(u.username||'').trim().toLocaleLowerCase('tr-TR')==='m.ilcin');
-    const now=new Date().toISOString();
-    if(!adminUser){
-      adminUser={id:'USR-ADMIN',username:'m.ilcin',fullName:'Muhammet İlçin',role:'admin',active:true,passwordHash:hash,createdAt:now,updatedAt:now};
-      users.unshift(adminUser);
-    }else{
-      adminUser.role='admin';adminUser.active=true;adminUser.passwordHash=hash;adminUser.updatedAt=now;
-    }
-    saveUsers();return adminUser;
-  }
-  return null;
+  return hash===user.passwordHash?user:null;
 }
 function userRowsHtml(){return users.slice().sort((a,b)=>(a.role===b.role?String(a.fullName||a.username).localeCompare(String(b.fullName||b.username),'tr'):(a.role==='admin'?-1:1))).map(u=>`<tr><td><b>${esc(u.fullName||'—')}</b><br><small>@${esc(u.username)}</small></td><td><span class="user-role ${u.role==='admin'?'admin':''}">${esc(userRoleLabel(u.role))}</span></td><td><span class="user-status ${u.active!==false?'active':'passive'}"><i class="fa-solid ${u.active!==false?'fa-circle-check':'fa-circle-xmark'}"></i>${u.active!==false?'Aktif':'Pasif'}</span></td><td>${u.updatedAt?new Date(u.updatedAt).toLocaleString('tr-TR'):'—'}</td><td style="white-space:nowrap"><button class="mini-btn" onclick="openUserEditModal('${u.id}')"><i class="fa-solid fa-pen"></i> Düzenle</button>${u.id!==currentUser?.id?` <button class="mini-btn danger" onclick="deleteUserAccount('${u.id}')"><i class="fa-solid fa-trash"></i></button>`:''}</td></tr>`).join('')}
 async function openUserManager(){
@@ -605,11 +626,11 @@ function setQuickSummaryFilter(kind){
 function bindSummaryCard(id,handler){const el=document.getElementById(id);if(!el)return;el.onclick=handler;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();handler();}}}
 function openRecords(){const rows=buildings.filter(buildingMatches).map(b=>{const s=buildingNoticeSummary(b),c=getCriticalInfo(b);return `<tr onclick="closeModal();selectBuilding('${b.id}',true)" style="cursor:pointer"><td>${esc(b.riskFileNo)}</td><td>${esc(b.maks)}</td><td>${esc(b.district)} / ${esc(b.neighborhood)}</td><td>${esc(b.ada)}/${esc(b.parsel)}</td><td>${(b.owners||[]).length}</td><td>${s.complete}/${s.total}</td><td>${b.stage}) ${esc(stages[b.stage].name)}</td><td>${c?`<span style="color:${deadlineState(c).color};font-weight:700">${esc(deadlineState(c).label)}</span>`:'—'}</td></tr>`}).join('');openModal('Riskli Yapı Kayıt Listesi',`<div class="notice-box">Satıra tıklayarak yapıyı haritada açabilirsiniz.</div><div class="table-wrap"><table class="table"><thead><tr><th>Dosya</th><th>MAKS</th><th>Konum</th><th>Ada/Parsel</th><th>Malik</th><th>Tebligat</th><th>Süreç</th><th>Kritik Süre</th></tr></thead><tbody>${rows||'<tr><td colspan="8">Kayıt yok.</td></tr>'}</tbody></table></div>`,`<button class="btn" onclick="closeModal()">Kapat</button>`,'xl')}
 function openAudit(){const rows=audit.map(a=>`<tr><td>${new Date(a.at).toLocaleString('tr-TR')}</td><td>${esc(a.user||'—')}</td><td>${esc(a.role)}</td><td>${esc(a.action)}</td><td>${esc(a.detail||'')}</td></tr>`).join('');openModal('İşlem Logu',`<div class="table-wrap"><table class="table"><thead><tr><th>Zaman</th><th>Kullanıcı</th><th>Rol</th><th>İşlem</th><th>Detay</th></tr></thead><tbody>${rows||'<tr><td colspan="5">Henüz log yok.</td></tr>'}</tbody></table></div>`,`<button class="btn" onclick="closeModal()">Kapat</button>`,'xl')}
-function exportJson(){const blob=new Blob([JSON.stringify({version:14,exportedAt:new Date().toISOString(),buildings},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='riskli_yapi_takip_v14_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);logAction('JSON dışa aktarıldı')}
+function exportJson(){const blob=new Blob([JSON.stringify({version:15,exportedAt:new Date().toISOString(),buildings},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='riskli_yapi_takip_v15_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);logAction('JSON dışa aktarıldı')}
 function importJson(file){const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);const arr=Array.isArray(x)?x:x.buildings;if(!Array.isArray(arr))throw new Error('Geçersiz veri yapısı');if(!confirm(arr.length+' yapı içeri alınacak ve mevcut demo verisi değiştirilecek. Devam?'))return;buildings=arr;saveData('JSON içeri aktarıldı',arr.length+' yapı');populateFilters();renderMap();closeModal();alert('İçe aktarma tamamlandı.')}catch(e){alert('JSON okunamadı: '+e.message)}};r.readAsText(file)}
 
 const btnResetDemoUsers=document.getElementById('btnResetDemoUsers');
-if(btnResetDemoUsers)btnResetDemoUsers.onclick=async()=>{if(!confirm('Demo kullanıcıları sıfırlansın mı? Eklediğiniz yerel kullanıcı hesapları silinir.'))return;await ensureUsers(true);loginUsername.value='m.ilcin';loginPassword.value='M.1234';showLoginError('Kullanıcılar sıfırlandı. m.ilcin / M.1234 ile giriş yapabilirsiniz.');};
+if(btnResetDemoUsers)btnResetDemoUsers.onclick=async()=>{if(!confirm('Demo kullanıcıları sıfırlansın mı? Eklediğiniz yerel kullanıcı hesapları silinir.'))return;await ensureUsers(true);loginUsername.value='m.ilcin';loginPassword.value='M.1234';showLoginError('Kullanıcılar sıfırlandı. Ana yönetici: m.ilcin / M.1234');};
 loginForm.addEventListener('submit',async e=>{e.preventDefault();showLoginError('');const submit=e.submitter||loginForm.querySelector('button[type=submit]');if(submit)submit.disabled=true;try{const user=await authenticate(loginUsername.value,loginPassword.value);if(!user){showLoginError('Kullanıcı adı veya şifre hatalı ya da kullanıcı pasif.');return}currentUser={...user};currentRole=user.role;updatePermissionUi();loginOverlay.classList.add('hidden');logAction('Oturum açıldı',user.username);setTimeout(()=>{try{map&&map.invalidateSize()}catch(_e){}},120)}catch(err){console.error(err);showLoginError('Giriş sırasında hata oluştu. Sayfayı yenileyip tekrar deneyin.')}finally{if(submit)submit.disabled=false}});
 btnLogout.onclick=()=>{if(currentUser)logAction('Oturum kapatıldı',currentUser.username);currentUser=null;currentRole='viewer';updatePermissionUi();loginPassword.value='';showLoginError('');loginOverlay.classList.remove('hidden');setTimeout(()=>loginUsername.focus(),50)};btnNewBuilding.onclick=()=>openBuildingModal();btnRecords.onclick=openRecords;btnAudit.onclick=openAudit;if(btnUsers)btnUsers.onclick=openUserManager;btnExport.onclick=exportJson;btnImport.onclick=()=>importFile.click();importFile.onchange=e=>{if(e.target.files[0])importJson(e.target.files[0]);e.target.value=''};
 [globalSearch,stageFilter,noticeFilter].forEach(el=>el.addEventListener(el===globalSearch?'input':'change',renderMap));districtFilter.addEventListener('change',()=>{renderMap();zoomToDistrict(districtFilter.value)});if(baseMapSelect)baseMapSelect.addEventListener('change',e=>switchBaseMap(e.target.value));if(btnBayrakliReference)btnBayrakliReference.addEventListener('click',toggleBayrakliReference);if(btn3DView)btn3DView.addEventListener('click',open3DView);btnResetFilters.onclick=()=>{globalSearch.value='';districtFilter.value='all';stageFilter.value='all';noticeFilter.value='all';renderMap();zoomToDistrict('all')};btnNotifications.onclick=openNotificationCenter;btnDocuments.onclick=openDocumentsOverview;sidePanelToggle.onclick=()=>toggleSidePanel();bindSummaryCard('totalSummaryCard',openRecords);bindSummaryCard('ownersSummaryCard',openOwnersOverview);bindSummaryCard('pendingSummaryCard',()=>setQuickSummaryFilter('pending'));bindSummaryCard('noticeDoneSummaryCard',()=>setQuickSummaryFilter('complete'));bindSummaryCard('criticalSummaryCard',openDeadlineDashboard);bindSummaryCard('completedSummaryCard',()=>setQuickSummaryFilter('completed'));
